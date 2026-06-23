@@ -47,19 +47,23 @@ def load_data():
     try:
         df = pd.read_csv(url)
         
-        # ค้นหาและจับคู่ชื่อคอลัมน์อัตโนมัติ
+        # ค้นหาและจับคู่ชื่อคอลัมน์อัตโนมัติ (เพิ่มรองรับ Year2)
         rename_dict = {}
         for col in df.columns:
-            if 'ปี' in col or 'year' in col.lower():
+            col_lower = str(col).lower().strip()
+            if 'year2' in col_lower:
                 rename_dict[col] = 'Year'
-            elif 'sdg' in col.lower() or 'เป้าหมาย' in col:
+            elif 'ปี' in col_lower or 'year' in col_lower:
+                if 'Year' not in rename_dict.values(): # ถ้ายังไม่มีการจับคู่ Year2 ให้ใช้คอลัมน์ปีทั่วไป
+                    rename_dict[col] = 'Year'
+            elif 'sdg' in col_lower or 'เป้าหมาย' in col_lower:
                 rename_dict[col] = 'SDG'
-            elif 'บทความ' in col or 'title' in col.lower() or 'ชื่อ' in col:
+            elif 'บทความ' in col_lower or 'title' in col_lower or 'ชื่อ' in col_lower:
                 rename_dict[col] = 'Title'
                 
         df = df.rename(columns=rename_dict)
         
-        # จัดการกรณีไม่มีคอลัมน์หลัก
+        # จัดการกรณีระบบหาคอลัมน์หลักไม่เจอ
         if 'Year' not in df.columns: df['Year'] = 2026
         if 'SDG' not in df.columns: df['SDG'] = "ไม่ระบุ"
         if 'Title' not in df.columns: df['Title'] = "บทความวิจัย"
@@ -111,93 +115,3 @@ df_filtered_exploded = df_exploded[
 st.subheader("🏢 สำหรับผู้บริหาร: ภาพรวมการดำเนินงาน")
 
 col1, col2, col3 = st.columns(3)
-
-with col1:
-    total_articles = df_filtered_raw.shape[0]
-    st.metric(label="📄 จำนวนบทความทั้งหมด (ตามตัวกรอง)", value=f"{total_articles} บทความ")
-
-with col2:
-    # นับบทความที่สอดคล้อง (ไม่เป็นค่าว่าง หรือ 'ไม่ระบุ')
-    matching_sdg_count = df_filtered_raw[
-        df_filtered_raw['SDG'].notna() & 
-        (df_filtered_raw['SDG'] != '') & 
-        (~df_filtered_raw['SDG'].str.lower().str.contains('ไม่ระบุ', na=True)) &
-        (~df_filtered_raw['SDG'].str.lower().str.contains('nan', na=True))
-    ].shape[0]
-    
-    st.metric(
-        label="🎯 บทความที่สอดคล้องกับ SDG", 
-        value=f"{matching_sdg_count} / {total_articles}",
-        delta=f"คิดเป็น {(matching_sdg_count/total_articles*100):.1f}%" if total_articles > 0 else "0%"
-    )
-
-with col3:
-    if len(selected_years) > 0:
-        year_range = f"{min(selected_years)} - {max(selected_years)}"
-    else:
-        year_range = "-"
-    st.metric(label="📅 ช่วงปีที่เผยแพร่ข้อมูล", value=year_range)
-
-st.write("---")
-
-# ส่วนแสดงกราฟสรุป
-chart_col1, chart_col2 = st.columns(2)
-
-with chart_col1:
-    st.markdown("**📈 5) จำนวนบทความวิจัยแยกตามปี ค.ศ.**")
-    df_year_count = df_filtered_raw.groupby('Year').size().reset_index(name='จำนวนบทความ')
-    fig_year = px.line(
-        df_year_count, x='Year', y='จำนวนบทความ', 
-        markers=True, text='จำนวนบทความ',
-        color_discrete_sequence=['#1E3A8A']
-    )
-    fig_year.update_traces(textposition="top center")
-    fig_year.update_layout(xaxis_title="ปี ค.ศ.", yaxis_title="จำนวนบทความ (เรื่อง)")
-    st.plotly_chart(fig_year, use_container_width=True)
-
-with chart_col2:
-    st.markdown("**📊 4) สัดส่วนและจำนวนบทความจำแนกตามเป้าหมาย SDG (1-17)**")
-    df_sdg_count = df_filtered_exploded.groupby('SDG_Split').size().reset_index(name='จำนวนบทความ')
-    df_sdg_count = df_sdg_count.sort_values(by='จำนวนบทความ', ascending=True)
-    
-    fig_sdg = px.bar(
-        df_sdg_count, x='จำนวนบทความ', y='SDG_Split', 
-        orientation='h', text='จำนวนบทความ',
-        color='จำนวนบทความ', color_continuous_scale='Blues'
-    )
-    fig_sdg.update_traces(textposition="outside")
-    fig_sdg.update_layout(yaxis_title="เป้าหมาย SDG", xaxis_title="จำนวนบทความ (เรื่อง)", showlegend=False)
-    st.plotly_chart(fig_sdg, use_container_width=True)
-
-# ==========================================
-# 2. ส่วนรายละเอียดเชิงลึกสำหรับทีมปฏิบัติการ (Operational Insights)
-# ==========================================
-st.write("---")
-st.subheader("🔬 สำหรับทีมปฏิบัติการ: รายละเอียดเชิงลึกและข้อมูลดิบ")
-
-st.markdown("**📊 6) จำนวนบทความที่สอดคล้องในแต่ละ SDG แยกตามปี ค.ศ. (เปรียบเทียบแนวโน้ม)**")
-if not df_filtered_exploded.empty:
-    df_cross = df_filtered_exploded.groupby(['Year', 'SDG_Split']).size().reset_index(name='จำนวนบทความ')
-    fig_cross = px.bar(
-        df_cross, x='SDG_Split', y='จำนวนบทความ', color='Year',
-        barmode='group', text='จำนวนบทความ',
-        labels={'SDG_Split': 'เป้าหมาย SDG', 'Year': 'ปี ค.ศ.'},
-        color_continuous_scale='Viridis'
-    )
-    fig_cross.update_traces(textposition='outside')
-    st.plotly_chart(fig_cross, use_container_width=True)
-else:
-    st.info("ไม่มีข้อมูลสอดคล้องตามตัวกรองที่เลือก")
-
-st.markdown("**📋 ตารางข้อมูลบทความวิจัยทั้งหมด (กรองแล้ว)**")
-st.dataframe(df_filtered_raw, use_container_width=True)
-
-csv = df_filtered_raw.to_csv(index=False).encode('utf-8-sig')
-st.download_button(
-    label="📥 ดาวน์โหลดข้อมูลชุดนี้เป็น CSV",
-    data=csv,
-    file_name='bsri_articles_sdg_filtered.csv',
-    mime='text/csv',
-)
-
-st.caption("ระบบดึงข้อมูลอัปเดตแบบ Real-time จาก Google Sheets ของสถาบันวิจัยพฤติกรรมศาสตร์")
