@@ -132,7 +132,7 @@ def load_data():
 df_raw, df_exploded = load_data()
 
 # ==========================================
-# ส่วนของ SIDEBAR FILTERS (ย้ายมาไว้ข้างๆ แยกสัดส่วนชัดเจน)
+# ส่วนของ SIDEBAR FILTERS
 # ==========================================
 st.sidebar.header("🔍 ตัวกรองข้อมูล")
 
@@ -181,7 +181,7 @@ with chart_row1_col1:
     if not df_sdg_plot.empty:
         df_sdg_count = df_sdg_plot.groupby('SDG_Target').size().reset_index(name='จำนวนบทความ')
         
-        # จัดเรียงลำดับตามตัวเลข SDG เพื่อให้แสดงเรียงจาก 1 ไป 17 สวยงาม
+        # จัดเรียงลำดับตามตัวเลข SDG เพื่อให้แสดงเรียงจาก 1 ไป 17
         df_sdg_count['sort_idx'] = df_sdg_count['SDG_Target'].str.extract('(\d+)').astype(int)
         df_sdg_count = df_sdg_count.sort_values('sort_idx')
         
@@ -194,4 +194,77 @@ with chart_row1_col1:
         fig_sdg.update_layout(
             font=dict(family="K2D", size=13),
             showlegend=False,
-            margin=dict(t=10, b=10
+            margin=dict(t=10, b=10, l=10, r=10),
+            xaxis_title="", yaxis_title="จำนวนบทความ (บทความ)"
+        )
+        st.plotly_chart(fig_sdg, use_container_width=True)
+    else:
+        st.info("ไม่มีข้อมูลสถิติเป้าหมาย")
+
+with chart_row1_col2:
+    st.markdown("### 📅 จำนวนบทความตามปี")
+    if not df_filtered_raw.empty:
+        df_year_count = df_filtered_raw.groupby('Year').size().reset_index(name='จำนวนบทความ')
+        df_year_count['Year'] = df_year_count['Year'].astype(str)
+        
+        fig_year = px.bar(
+            df_year_count, x='Year', y='จำนวนบทความ', 
+            text='จำนวนบทความ', color_discrete_sequence=['#2563EB']
+        )
+        fig_year.update_traces(textposition="outside")
+        fig_year.update_layout(
+            font=dict(family="K2D", size=13),
+            margin=dict(t=10, b=10, l=10, r=10),
+            xaxis_title="ปี", yaxis_title="จำนวนบทความ (บทความ)"
+        )
+        st.plotly_chart(fig_year, use_container_width=True)
+
+# ==========================================
+# 📊 SECTION 3: กราฟแถวล่าง (Top 10 SDGs & Top 10 ผู้แต่ง)
+# ==========================================
+chart_row2_col1, chart_row2_col2 = st.columns(2)
+
+with chart_row2_col1:
+    st.markdown("### 🏆 Top 10 SDGs ที่พบมากที่สุด")
+    if not df_sdg_plot.empty:
+        df_top_sdg = df_sdg_plot.groupby('SDG_Target').size().reset_index(name='จำนวนบทความ').sort_values(by='จำนวนบทความ', ascending=True).tail(10)
+        fig_top_sdg = px.bar(
+            df_top_sdg, x='จำนวนบทความ', y='SDG_Target', 
+            orientation='h', text='จำนวนบทความ',
+            color='จำนวนบทความ', color_continuous_scale='Greens'
+        )
+        fig_top_sdg.update_traces(textposition="outside")
+        fig_top_sdg.update_layout(
+            font=dict(family="K2D", size=12), 
+            coloraxis_showscale=False, 
+            xaxis_title="จำนวนบทความ (บทความ)", 
+            yaxis_title="",
+            margin=dict(t=10, b=10, l=10, r=10)
+        )
+        st.plotly_chart(fig_top_sdg, use_container_width=True)
+
+with chart_row2_col2:
+    st.markdown("### 👥 Top 10 ผู้แต่งที่มีบทความมากที่สุด")
+    if not df_filtered_raw.empty:
+        df_top_author = df_filtered_raw.groupby('Author').size().reset_index(name='จำนวนบทความ').sort_values(by='จำนวนบทความ', ascending=True).tail(10)
+        fig_top_author = px.bar(
+            df_top_author, x='จำนวนบทความ', y='Author', 
+            orientation='h', text='จำนวนบทความ',
+            color_discrete_sequence=['#84CC16']
+        )
+        fig_top_author.update_traces(textposition="outside")
+        fig_top_author.update_layout(
+            font=dict(family="K2D", size=12), 
+            xaxis_title="จำนวนบทความ (บทความ)", 
+            yaxis_title="",
+            margin=dict(t=10, b=10, l=10, r=10)
+        )
+        st.plotly_chart(fig_top_author, use_container_width=True)
+
+# ==========================================
+# 🔬 SECTION 4: ตารางข้อมูลดิบด้านล่างสุด
+# ==========================================
+st.write("---")
+st.subheader("🔬 รายละเอียดบทความวิจัยทั้งหมด")
+display_cols = [c for c in ['Year', 'Title', 'Author'] if c in df_filtered_raw.columns]
+st.dataframe(df_filtered_raw[display_cols], use_container_width=True)
