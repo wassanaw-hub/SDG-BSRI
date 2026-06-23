@@ -147,4 +147,37 @@ with chart_col1:
     st.markdown("**📈 จำนวนบทความวิจัยแยกตามปี ค.ศ.**")
     if not df_filtered_raw.empty:
         df_year_count = df_filtered_raw.groupby('Year').size().reset_index(name='จำนวนบทความ')
-        fig_year = px.line(df_year_count, x='Year', y='จำนวนบทความ', markers=True, text='จำนวนบทความ', color_discrete_
+        fig_year = px.line(df_year_count, x='Year', y='จำนวนบทความ', markers=True, text='จำนวนบทความ', color_discrete_sequence=['#1E3A8A'])
+        fig_year.update_traces(textposition="top center")
+        
+        # บังคับให้กราฟ Plotly ใช้ฟอนต์ K2D ด้วย
+        fig_year.update_layout(font=dict(family="K2D", size=14))
+        st.plotly_chart(fig_year, use_container_width=True)
+    else:
+        st.info("ไม่มีข้อมูลสถิติรายปี")
+
+with chart_col2:
+    st.markdown("**📊 จำนวนบทความจำแนกตามเป้าหมาย SDG**")
+    df_sdg_plot = df_filtered_exploded[df_filtered_exploded['SDG_Target'] != 'ไม่ระบุ SDG']
+    if not df_sdg_plot.empty:
+        df_sdg_count = df_sdg_plot.groupby('SDG_Target').size().reset_index(name='จำนวนบทความ').sort_values(by='จำนวนบทความ', ascending=True)
+        fig_sdg = px.bar(df_sdg_count, x='จำนวนบทความ', y='SDG_Target', orientation='h', text='จำนวนบทความ', color='จำนวนบทความ', color_continuous_scale='Blues')
+        fig_sdg.update_traces(textposition="outside")
+        
+        # บังคับให้กราฟ Plotly ใช้ฟอนต์ K2D ด้วย
+        fig_sdg.update_layout(font=dict(family="K2D", size=14))
+        st.plotly_chart(fig_sdg, use_container_width=True)
+    else:
+        st.info("ไม่มีข้อมูลที่ตรงกับเป้าหมาย SDG")
+
+# ==========================================
+# 2. ส่วนตารางข้อมูลดิบ
+# ==========================================
+st.write("---")
+st.subheader("🔬 รายละเอียดบทความวิจัยทั้งหมดจาก Google Sheets")
+
+display_cols = [c for c in ['Year', 'Title', 'Author'] if c in df_filtered_raw.columns]
+st.dataframe(df_filtered_raw[display_cols], use_container_width=True)
+
+csv = df_filtered_raw[display_cols].to_csv(index=False).encode('utf-8-sig')
+st.download_button(label="📥 ดาวน์โหลดข้อมูลชุดนี้เป็น CSV", data=csv, file_name='bsri_sdg_report.csv', mime='text/csv')
