@@ -32,7 +32,7 @@ st.markdown("""
         box-shadow: 2px 2px 5px rgba(0,0,0,0.05);
     }
     </style>
-""", unsafe_allow_index=True)
+""", unsafe_allow_html=True)
 
 # หัวข้อหลักของ Dashboard
 st.markdown('<div class="main-title">📊ระบบรายงานสถิติตัวชี้วัดเป้าหมายการพัฒนาที่ยั่งยืน (SDGs)</div>', unsafe_allow_index=True)
