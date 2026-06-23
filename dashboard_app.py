@@ -10,13 +10,30 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# สไตล์ CSS เพิ่มความสวยงาม
+# ดึงฟอนต์ K2D มาจาก Google Fonts และบังคับใช้กับทุกองค์ประกอบบนหน้าเว็บ
 st.markdown("""
+    <import url('https://fonts.googleapis.com/css2?family=K2D:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800&display=swap');
+    
     <style>
-    .main-title { font-size: 28px; font-weight: bold; color: #1E3A8A; margin-bottom: 5px; }
-    .sub-title { font-size: 16px; color: #4B5563; margin-bottom: 25px; }
+    html, body, [data-testid="stSidebar"], .stApp, p, h1, h2, h3, h4, h5, h6, span, div, button, select, input {
+        font-family: 'K2D', sans-serif !important;
+    }
+    .main-title { 
+        font-size: 28px; 
+        font-weight: bold; 
+        color: #1E3A8A; 
+        margin-bottom: 5px; 
+    }
+    .sub-title { 
+        font-size: 16px; 
+        color: #4B5563; 
+        margin-bottom: 25px; 
+    }
     </style>
 """, unsafe_allow_html=True)
+
+# แก้ไขแท็กด้านซ้ายบนของ CSS เพื่อให้โหลด Google Fonts ได้ถูกต้อง
+st.markdown("<style>@import url('https://fonts.googleapis.com/css2?family=K2D:wght@300;400;600;700&display=swap');</style>", unsafe_allow_html=True)
 
 st.markdown('<div class="main-title">📊ระบบรายงานสถิติตัวชี้วัดเป้าหมายการพัฒนาที่ยั่งยืน (SDGs)</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-title">สถาบันวิจัยพฤติกรรมศาสตร์ มหาวิทยาลัยศรีนครินทรวิโรฒ</div>', unsafe_allow_html=True)
@@ -60,7 +77,6 @@ def load_data():
         has_sdg = False
         for col in sdg_cols:
             val = str(row[col]).strip()
-            # เช็กว่าช่องนั้นไม่ใช่ค่าว่าง หรือศูนย์
             if val != '' and val != 'nan' and val.lower() != 'none' and val != '0' and val != '0.0':
                 sdg_name = col.replace('SDG', 'SDG ')
                 exploded_records.append({
@@ -131,31 +147,4 @@ with chart_col1:
     st.markdown("**📈 จำนวนบทความวิจัยแยกตามปี ค.ศ.**")
     if not df_filtered_raw.empty:
         df_year_count = df_filtered_raw.groupby('Year').size().reset_index(name='จำนวนบทความ')
-        fig_year = px.line(df_year_count, x='Year', y='จำนวนบทความ', markers=True, text='จำนวนบทความ', color_discrete_sequence=['#1E3A8A'])
-        fig_year.update_traces(textposition="top center")
-        st.plotly_chart(fig_year, use_container_width=True)
-    else:
-        st.info("ไม่มีข้อมูลสถิติรายปี")
-
-with chart_col2:
-    st.markdown("**📊 จำนวนบทความจำแนกตามเป้าหมาย SDG**")
-    df_sdg_plot = df_filtered_exploded[df_filtered_exploded['SDG_Target'] != 'ไม่ระบุ SDG']
-    if not df_sdg_plot.empty:
-        df_sdg_count = df_sdg_plot.groupby('SDG_Target').size().reset_index(name='จำนวนบทความ').sort_values(by='จำนวนบทความ', ascending=True)
-        fig_sdg = px.bar(df_sdg_count, x='จำนวนบทความ', y='SDG_Target', orientation='h', text='จำนวนบทความ', color='จำนวนบทความ', color_continuous_scale='Blues')
-        fig_sdg.update_traces(textposition="outside")
-        st.plotly_chart(fig_sdg, use_container_width=True)
-    else:
-        st.info("ไม่มีข้อมูลที่ตรงกับเป้าหมาย SDG")
-
-# ==========================================
-# 2. ส่วนตารางข้อมูลดิบ
-# ==========================================
-st.write("---")
-st.subheader("🔬 รายละเอียดบทความวิจัยทั้งหมดจาก Google Sheets")
-
-display_cols = [c for c in ['Year', 'Title', 'Author'] if c in df_filtered_raw.columns]
-st.dataframe(df_filtered_raw[display_cols], use_container_width=True)
-
-csv = df_filtered_raw[display_cols].to_csv(index=False).encode('utf-8-sig')
-st.download_button(label="📥 ดาวน์โหลดข้อมูลชุดนี้เป็น CSV", data=csv, file_name='bsri_sdg_report.csv', mime='text/csv')
+        fig_year = px.line(df_year_count, x='Year', y='จำนวนบทความ', markers=True, text='จำนวนบทความ', color_discrete_
