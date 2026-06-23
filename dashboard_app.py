@@ -28,6 +28,7 @@ def load_data():
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
     
     df = pd.read_csv(url)
+    
     # ล้างชื่อคอลัมน์ ลบเว้นวรรค และลบตัวขึ้นบรรทัดใหม่ (\n) ออกให้หมด
     df.columns = [str(c).replace('\n', '').replace(' ', '').strip() for c in df.columns]
     
@@ -38,16 +39,20 @@ def load_data():
             rename_dict[col] = 'Year'
         elif 'ArticleTitle(Thai)' in col:
             rename_dict[col] = 'Title'
+        elif 'Author' in col:
+            rename_dict[col] = 'Author'
             
     df = df.rename(columns=rename_dict)
     
     if 'Year' not in df.columns: df['Year'] = 2026
     if 'Title' not in df.columns: df['Title'] = "ไม่ระบุชื่อบทความ"
+    if 'Author' not in df.columns: df['Author'] = "ไม่ระบุชื่อผู้แต่ง"
     
     df['Year'] = pd.to_numeric(df['Year'], errors='coerce').fillna(0).astype(int)
     df['Title'] = df['Title'].fillna("ไม่ระบุชื่อบทความ").astype(str)
+    df['Author'] = df['Author'].fillna("ไม่ระบุชื่อผู้แต่ง").astype(str)
     
-    # รวบรวมข้อมูลจากคอลัมน์ SDG1 - SDG17 มารวมเป็นรายการคอลัมน์เดียวเพื่อใช้วาดกราฟ
+    # รวบรวมข้อมูลจากคอลัมน์ SDG1 - SDG17
     sdg_cols = [c for c in df.columns if 'SDG' in c]
     
     exploded_records = []
@@ -55,13 +60,13 @@ def load_data():
         has_sdg = False
         for col in sdg_cols:
             val = str(row[col]).strip()
-            # ตรวจสอบว่าในช่องนั้นมีการติ๊กเลือก หรือระบุข้อมูล SDG หรือไม่ (ไม่เป็นค่าว่าง หรือ NaN)
-            if val != '' and val != 'nan' and val.lower() != 'none' and val != '0':
-                #ดึงชื่อ SDG เช่น SDG1, SDG2 มาใช้
+            # เช็กว่าช่องนั้นไม่ใช่ค่าว่าง หรือศูนย์
+            if val != '' and val != 'nan' and val.lower() != 'none' and val != '0' and val != '0.0':
                 sdg_name = col.replace('SDG', 'SDG ')
                 exploded_records.append({
                     'Year': row['Year'],
                     'Title': row['Title'],
+                    'Author': row['Author'],
                     'SDG_Target': sdg_name
                 })
                 has_sdg = True
@@ -69,6 +74,7 @@ def load_data():
             exploded_records.append({
                 'Year': row['Year'],
                 'Title': row['Title'],
+                'Author': row['Author'],
                 'SDG_Target': 'ไม่ระบุ SDG'
             })
             
@@ -108,10 +114,9 @@ with col1:
     st.metric(label="📄 จำนวนบทความทั้งหมด (ตามปีที่เลือก)", value=f"{total_articles} บทความ")
 
 with col2:
-    # นับบทความที่มีการระบุ SDG จริงๆ
     articles_with_sdg = df_filtered_exploded[df_filtered_exploded['SDG_Target'] != 'ไม่ระบุ SDG']['Title'].nunique()
     pct = (articles_with_sdg / total_articles * 100) if total_articles > 0 else 0
-    st.metric(label="🎯 บทความที่สนับสนุนเป้าหมาย SDG", value=f"{articles_with_sdg} เรื่อง", delta=f"คิดเป็น {pct:.1f}% ของทั้งหมด")
+    st.metric(label="🎯 บทความที่สนับสนุนเป้าหมาย SDG", value=f"{articles_with_sdg} เรื่อง", delta=f"คิดเป็น {pct:.1f}%")
 
 with col3:
     year_range = f"{min(selected_years)} - {max(selected_years)}" if selected_years else "-"
@@ -130,11 +135,10 @@ with chart_col1:
         fig_year.update_traces(textposition="top center")
         st.plotly_chart(fig_year, use_container_width=True)
     else:
-        st.info("ไม่มีข้อมูลในโปรเจกต์นี้")
+        st.info("ไม่มีข้อมูลสถิติรายปี")
 
 with chart_col2:
-    st.markdown("**📊 จำนวนบทความจำแนกตามเป้าหมาย SDG (รวมทุกคอลัมน์)**")
-    # ไม่เอารายการ "ไม่ระบุ SDG" มาพล็อตกราฟแท่งเป้าหมาย เพื่อความสวยงาม
+    st.markdown("**📊 จำนวนบทความจำแนกตามเป้าหมาย SDG**")
     df_sdg_plot = df_filtered_exploded[df_filtered_exploded['SDG_Target'] != 'ไม่ระบุ SDG']
     if not df_sdg_plot.empty:
         df_sdg_count = df_sdg_plot.groupby('SDG_Target').size().reset_index(name='จำนวนบทความ').sort_values(by='จำนวนบทความ', ascending=True)
@@ -142,4 +146,16 @@ with chart_col2:
         fig_sdg.update_traces(textposition="outside")
         st.plotly_chart(fig_sdg, use_container_width=True)
     else:
-        st.
+        st.info("ไม่มีข้อมูลที่ตรงกับเป้าหมาย SDG")
+
+# ==========================================
+# 2. ส่วนตารางข้อมูลดิบ
+# ==========================================
+st.write("---")
+st.subheader("🔬 รายละเอียดบทความวิจัยทั้งหมดจาก Google Sheets")
+
+display_cols = [c for c in ['Year', 'Title', 'Author'] if c in df_filtered_raw.columns]
+st.dataframe(df_filtered_raw[display_cols], use_container_width=True)
+
+csv = df_filtered_raw[display_cols].to_csv(index=False).encode('utf-8-sig')
+st.download_button(label="📥 ดาวน์โหลดข้อมูลชุดนี้เป็น CSV", data=csv, file_name='bsri_sdg_report.csv', mime='text/csv')
